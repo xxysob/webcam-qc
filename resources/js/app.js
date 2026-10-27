@@ -17,6 +17,7 @@ const el = {
   chipCam: document.getElementById("chipCam"),
   chipMic: document.getElementById("chipMic"),
   camSelect: document.getElementById("camSelect"),
+  camMode: document.getElementById("camMode"),
   micSelect: document.getElementById("micSelect"),
   meterShade: document.getElementById("meterShade"),
   meterPeak: document.getElementById("meterPeak"),
@@ -42,6 +43,10 @@ const state = {
   peakDb: -140,
   peakAt: 0,
   slowPromptTimer: 0,
+  modes: [],
+  modeCache: new Map(),
+  modeValue: "auto",
+  scanToken: 0,
 };
 
 /* ------------------------------------------------------------------ */
@@ -235,14 +240,17 @@ function attachVideo(stream) {
   const p = el.video.play();
   if (p && p.catch) p.catch(() => {});
 
-  const s = track.getSettings ? track.getSettings() : {};
-  const nominalFps = s.frameRate ? Math.round(s.frameRate) : null;
+  updateCamInfo(track);
+  measureFps(el.video);
+}
+
+function updateCamInfo(track) {
+  const s = track && track.getSettings ? track.getSettings() : {};
+  const fps = s.frameRate ? Math.round(s.frameRate) : null;
   el.camInfo.textContent =
     s.width && s.height
-      ? `${s.width}x${s.height}${nominalFps ? " · " + nominalFps + " fps" : ""}`
+      ? `${s.width}×${s.height}${fps ? " · " + fps + " fps" : ""}`
       : "Resolusi —";
-
-  measureFps(el.video);
 }
 
 function measureFps(video) {
@@ -267,6 +275,283 @@ function measureFps(video) {
 
   el.camFps.textContent = "— fps";
   video.requestVideoFrameCallback(onFrame);
+}
+
+/* ------------------------------------------------------------------ */
+/* Mode resolusi kamera                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Kandidat mode UVC standar.
+ * Browser tidak punya API untuk menanyakan daftar mode kamera, jadi mode
+ * dicoba satu per satu lewat applyConstraints lalu diverifikasi.
+ */
+const UVC_MODES = [
+  [1920, 1080], [1600, 900], [1280, 720], [1024, 576],
+  [960, 540], [848, 480], [800, 600], [640, 480],
+  [640, 360], [424, 240], [352, 288], [320, 240],
+  [320, 180], [176, 144],
+];
+
+function gcd(a, b) {
+  while (b) {
+    const t = b;
+    b = a % b;
+    a = t;
+  }
+  return a;
+}
+
+/** Label gaya aplikasi Camera Windows: "720p 16:9 — 1280×720 · 30fps" */
+function modeLabel(w, h, fps) {
+  const g = gcd(w, h) || 1;
+  return `${h}p ${w / g}:${h / g} — ${w}×${h}${fps ? ` · ${fps}fps` : ""}`;
+}
+
+function modeCacheKey(track) {
+  const s = track.getSettings ? track.getSettings() : {};
+  return s.deviceId || track.label || "default";
+}
+
+function resetModeSelect() {
+  const select = el.camMode;
+  while (select.firstChild) select.removeChild(select.firstChild);
+
+  const auto = document.createElement("option");
+  auto.value = "auto";
+  auto.textContent = "Auto";
+  select.appendChild(auto);
+
+  select.value = "auto";
+  select.disabled = true;
+  state.modeValue = "auto";
+  state.modes = [];
+}
+
+function fillModeSelect(modes, busy) {
+  const select = el.camMode;
+  while (select.firstChild) select.removeChild(select.firstChild);
+
+  const auto = document.createElement("option");
+  auto.value = "auto";
+  if (busy) {
+    auto.textContent = "Auto — memindai mode…";
+  } else if (modes.length) {
+    auto.textContent = `Auto (maksimum ${modes[0].w}×${modes[0].h})`;
+  } else {
+    auto.textContent = "Auto (maksimum kamera)";
+  }
+  select.appendChild(auto);
+
+  modes.forEach((m) => {
+    const opt = document.createElement("option");
+    opt.value = `${m.w}x${m.h}`;
+    opt.textContent = modeLabel(m.w, m.h, m.fps);
+    select.appendChild(opt);
+  });
+
+  const exists = Array.prototype.some.call(
+    select.options,
+    (o) => o.value === state.modeValue
+  );
+  select.value = exists ? state.modeValue : "auto";
+  state.modeValue = select.value;
+  select.disabled = busy || modes.length === 0;
+}
+
+/**
+ * Coba setiap kandidat mode pada track yang sudah hidup.
+ * Hanya mode yang benar-benar native yang dikembalikan: Chromium bisa
+ * memenuhi constraint `exact` dengan scaling, dan kasus itu ditandai
+ * getSettings().resizeMode === "crop-and-scale".
+ */
+async function scanModes(track) {
+  const caps = (track.getCapabilities && track.getCapabilities()) || {};
+  const maxW = (caps.width && caps.width.max) || 4096;
+  const maxH = (caps.height && caps.height.max) || 2160;
+  const start = track.getSettings ? track.getSettings() : {};
+  const found = [];
+
+  for (const [w, h] of UVC_MODES) {
+    if (w > maxW || h > maxH) continue;
+
+    let applied = false;
+    try {
+      await track.applyConstraints({
+        width: { exact: w },
+        height: { exact: h },
+        resizeMode: "none",
+      });
+      applied = true;
+    } catch (e) {
+      // Sebagian driver menolak resizeMode; coba tanpa properti itu.
+      try {
+        await track.applyConstraints({ width: { exact: w }, height: { exact: h } });
+        applied = true;
+      } catch (e2) {
+        continue; // mode tidak ada di kamera ini
+      }
+    }
+    if (!applied) continue;
+
+    const s = track.getSettings();
+    if (s.width !== w || s.height !== h) continue; // diminta tapi tidak dapat
+    if (s.resizeMode === "crop-and-scale") continue; // hasil scaling, bukan mode sensor
+
+    found.push({ w, h, fps: s.frameRate ? Math.round(s.frameRate) : null });
+  }
+
+  // Kembalikan ke mode sebelum pemindaian.
+  if (start.width && start.height) {
+    try {
+      await track.applyConstraints({
+        width: { exact: start.width },
+        height: { exact: start.height },
+      });
+    } catch (e) {
+      /* biarkan memakai mode terakhir */
+    }
+  }
+
+  return found.sort((a, b) => b.w * b.h - a.w * a.h);
+}
+
+/** Urutan percobaan untuk Auto: mode native terbesar, lalu batas driver, lalu ideal. */
+function autoAttempts(track) {
+  const caps = (track.getCapabilities && track.getCapabilities()) || {};
+  const top = state.modes[0];
+  const maxW = (caps.width && caps.width.max) || 1920;
+  const maxH = (caps.height && caps.height.max) || 1080;
+  const list = [];
+
+  if (top) {
+    list.push({
+      width: { exact: top.w },
+      height: { exact: top.h },
+      resizeMode: "none",
+    });
+    list.push({ width: { exact: top.w }, height: { exact: top.h } });
+  }
+  if (caps.width && caps.height && caps.width.max && caps.height.max) {
+    list.push({ width: { exact: maxW }, height: { exact: maxH } });
+  }
+  list.push({
+    width: { ideal: maxW },
+    height: { ideal: maxH },
+    frameRate: { ideal: 30 },
+  });
+  list.push({ frameRate: { ideal: 30 } });
+
+  return list;
+}
+
+/** Pasang mode tertentu, atau Auto kalau `mode` null. */
+async function applyMode(track, mode) {
+  const runs = mode
+    ? [
+        {
+          width: { exact: mode.w },
+          height: { exact: mode.h },
+          resizeMode: "none",
+        },
+        { width: { exact: mode.w }, height: { exact: mode.h } },
+      ]
+    : autoAttempts(track);
+
+  for (const c of runs) {
+    try {
+      await track.applyConstraints(c);
+      return true;
+    } catch (e) {
+      /* coba langkah berikutnya */
+    }
+  }
+  return false;
+}
+
+/** Pindai mode kamera (sekali per device), lalu pasang Auto. */
+async function prepareCameraModes() {
+  const track = state.stream && state.stream.getVideoTracks()[0];
+  if (!track) return;
+
+  const token = ++state.scanToken;
+  const key = modeCacheKey(track);
+
+  state.modeValue = "auto";
+  state.modes = [];
+  fillModeSelect([], true);
+
+  let modes = state.modeCache.get(key);
+  if (!modes) {
+    modes = await scanModes(track);
+    if (token !== state.scanToken) return; // kamera sudah diganti operator
+    state.modeCache.set(key, modes);
+  }
+  state.modes = modes;
+
+  if (state.modeValue === "auto") {
+    const ok = await applyMode(track, null);
+    if (token !== state.scanToken) return;
+    if (!ok) {
+      setStatus(
+        "Gagal memasang resolusi maksimum; kamera memakai setelan default.",
+        "error"
+      );
+    }
+  }
+
+  if (token !== state.scanToken) return;
+  updateCamInfo(track);
+  fillModeSelect(modes, false);
+
+  if (!modes.length) {
+    setStatus("Mode resolusi kamera tidak terbaca; hanya Auto yang tersedia.");
+  }
+}
+
+async function onModeChange() {
+  const track = state.stream && state.stream.getVideoTracks()[0];
+  if (!track) return;
+
+  const previous = state.modeValue;
+  const value = el.camMode.value;
+  el.camMode.disabled = true;
+
+  try {
+    if (value === "auto") {
+      const ok = await applyMode(track, null);
+      if (ok) {
+        state.modeValue = "auto";
+        const s = track.getSettings();
+        setStatus(`Resolusi kamera: ${s.width}×${s.height} (mode maksimum).`);
+      } else {
+        el.camMode.value = previous;
+        setStatus(
+          "Gagal memasang mode maksimum; mode sebelumnya dipertahankan.",
+          "error"
+        );
+      }
+    } else {
+      const [w, h] = value.split("x").map(Number);
+      const ok = await applyMode(track, { w, h });
+      const s = track.getSettings();
+      if (!ok) {
+        el.camMode.value = previous;
+        state.modeValue = previous;
+        setStatus(`Mode ${w}×${h} tidak tersedia di kamera ini.`, "error");
+      } else if (s.width !== w || s.height !== h) {
+        state.modeValue = previous;
+        el.camMode.value = previous;
+        setStatus(`Diminta ${w}×${h}, kamera memberi ${s.width}×${s.height}.`, "error");
+      } else {
+        state.modeValue = value;
+        setStatus(`Resolusi kamera: ${w}×${h}.`);
+      }
+    }
+    updateCamInfo(track);
+  } finally {
+    el.camMode.disabled = state.modes.length === 0;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -364,6 +649,7 @@ function applyMonitor() {
 /* ------------------------------------------------------------------ */
 
 function stopStream() {
+  state.scanToken += 1; // batalkan pemindaian mode yang masih jalan
   cancelAnimationFrame(state.meterRAF);
   state.meterRAF = 0;
 
@@ -389,6 +675,7 @@ function stopStream() {
   el.noSignal.classList.remove("hidden");
   el.camInfo.textContent = "Resolusi —";
   el.camFps.textContent = "— fps";
+  resetModeSelect();
   resetMeter();
 }
 
@@ -445,6 +732,9 @@ async function start() {
     }
 
     await refreshDevices();
+
+    // Pindai mode resolusi di latar belakang: preview sudah tampil lebih dulu.
+    if (camOk) prepareCameraModes().catch(() => {});
 
     if (camOk && micOk) {
       setStatus("Kamera & mikrofon aktif. Bicara untuk menguji mikrofon.", "ok");
@@ -523,6 +813,7 @@ function wire() {
 
   el.camSelect.addEventListener("change", () => start());
   el.micSelect.addEventListener("change", () => start());
+  el.camMode.addEventListener("change", () => onModeChange());
 
   el.monitorToggle.addEventListener("change", () => {
     state.monitoring = el.monitorToggle.checked;

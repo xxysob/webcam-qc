@@ -1,6 +1,6 @@
 {
   "name": "webcam-qc",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Webcam & Mic QC Tester -- portable, offline (Neutralinojs)",
   "license": "GPL-3.0",

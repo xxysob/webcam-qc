@@ -56,8 +56,8 @@ try {
       OriginalFilename: "WebcamQC-win_x64.exe",
     };
     vi.setStringValues({ lang: 1033, codepage: 1200 }, strings);
-    vi.setFileVersion(1, 0, 0, 0, 1033);
-    vi.setProductVersion(1, 0, 0, 0, 1033);
+    vi.setFileVersion(1, 0, 1, 0, 1033);
+    vi.setProductVersion(1, 0, 1, 0, 1033);
     vi.outputToResourceEntries(res.entries);
   }
 } catch (e) {
