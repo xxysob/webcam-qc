@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+
+# Neutralinojs binaries & build output (diambil ulang oleh `npx neu update` / `npm run dist`)
+/bin
+/dist
+/build
+
+# Neutralinojs runtime state
+.storage
+*.log
+
+# client library sengaja di-commit supaya repo bisa langsung dipakai
+!resources/js/neutralino.js
+
+# editor
+.lite_workspace.lua

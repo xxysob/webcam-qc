@@ -1,0 +1,20 @@
+{
+  "name": "webcam-qc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Webcam & Mic QC Tester -- portable, offline (Neutralinojs)",
+  "license": "GPL-3.0",
+  "author": "",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "neu run",
+    "build": "neu build --embed-resources",
+    "icon": "node scripts/embed-icon.js",
+    "dist": "neu build --embed-resources && node scripts/embed-icon.js"
+  },
+  "devDependencies": {
+    "@neutralinojs/neu": "^11.8.0",
+    "png2icons": "^2.0.1",
+    "resedit": "^3.1.0"
+  }
+}

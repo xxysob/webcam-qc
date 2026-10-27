@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob: mediastream:; connect-src 'self' ws://127.0.0.1:* http://127.0.0.1:*"
+  />
+  <title>Webcam &amp; Mic QC Tester</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+  <script src="./js/neutralino.js"></script>
+  <script defer src="./js/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <span>Webcam &amp; Mic QC Tester</span>
+    </div>
+    <div class="version" id="version">v1.0.0</div>
+  </header>
+
+  <main class="layout">
+    <!-- ============ KAMERA ============ -->
+    <section class="pane">
+      <div class="pane-head">
+        <h2>Kamera</h2>
+        <span class="chip idle" id="chipCam"><i></i>KAMERA —</span>
+      </div>
+
+      <div class="preview">
+        <video class="vid" id="video" autoplay muted playsinline></video>
+        <div class="no-signal" id="noSignal">
+          <span>Belum ada gambar</span>
+        </div>
+      </div>
+
+      <div class="video-meta">
+        <span id="camInfo">Resolusi —</span>
+        <span id="camFps" title="fps terukur (aktual)">— fps</span>
+      </div>
+
+      <label class="field">
+        <span>Perangkat kamera</span>
+        <select id="camSelect" disabled>
+          <option value="">Default sistem</option>
+        </select>
+      </label>
+    </section>
+
+    <!-- ============ MIKROFON ============ -->
+    <section class="pane">
+      <div class="pane-head">
+        <h2>Mikrofon</h2>
+        <span class="chip idle" id="chipMic"><i></i>MIC —</span>
+      </div>
+
+      <div class="meter-wrap">
+        <div class="meter" role="img" aria-label="Level mikrofon">
+          <div class="meter-grad"></div>
+          <div class="meter-shade" id="meterShade"></div>
+          <div class="meter-peak" id="meterPeak"></div>
+        </div>
+        <div class="meter-scale">
+          <span>-60</span><span>-30</span><span>-12</span><span>-3</span><span>0 dB</span>
+        </div>
+        <div class="meter-value"><span id="dbValue">—</span> <small>dBFS</small></div>
+      </div>
+
+      <label class="field">
+        <span>Perangkat mikrofon</span>
+        <select id="micSelect" disabled>
+          <option value="">Default sistem</option>
+        </select>
+      </label>
+
+      <div class="monitor">
+        <label class="switch">
+          <input type="checkbox" id="monitorToggle" checked />
+          <span class="track"><span class="knob"></span></span>
+          <span class="switch-label">Dengar langsung <small>(listen to this device)</small></span>
+        </label>
+        <div class="volume">
+          <span>Volume</span>
+          <input type="range" id="monitorVol" min="0" max="100" value="60" />
+          <span id="volValue">60%</span>
+        </div>
+        <p class="warn" id="feedbackWarn">
+          Pakai headphone. Tanpa headphone, suara bisa mengiut (feedback).
+        </p>
+      </div>
+
+      <div class="actions">
+        <button id="btnStart" class="btn primary">Mulai ulang</button>
+        <button id="btnReset" class="btn ghost">Reset</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="statusbar">
+    <p class="status" id="status">Menyiapkan…</p>
+    <div class="settings-links">
+      <button class="link" data-settings="privacy-webcam">Izin kamera</button>
+      <button class="link" data-settings="privacy-microphone">Izin mikrofon</button>
+    </div>
+  </footer>
+</body>
+</html>
