@@ -6,38 +6,45 @@
     http-equiv="Content-Security-Policy"
     content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob: mediastream:; connect-src 'self' ws://127.0.0.1:* http://127.0.0.1:*"
   />
+  <meta name="theme-color" content="#0d1117" />
+  <meta name="color-scheme" content="dark" />
   <title>Webcam &amp; Mic QC Tester</title>
   <link rel="stylesheet" href="./css/styles.css" />
   <script src="./js/neutralino.js"></script>
   <script defer src="./js/app.js"></script>
 </head>
 <body>
+  <a class="skip" href="#main">Lewati ke konten</a>
   <header class="topbar">
-    <div class="brand">
+    <h1 class="brand" translate="no">
       <span class="logo" aria-hidden="true"></span>
       <span>Webcam &amp; Mic QC Tester</span>
-    </div>
+    </h1>
     <div class="version" id="version">v1.0.1</div>
   </header>
 
-  <main class="layout">
+  <main class="layout" id="main">
     <!-- ============ KAMERA ============ -->
-    <section class="pane">
+    <section class="pane" aria-labelledby="hCam">
       <div class="pane-head">
-        <h2>Kamera</h2>
+        <h2 id="hCam">Kamera</h2>
         <span class="chip idle" id="chipCam"><i></i>KAMERA —</span>
       </div>
 
-      <div class="preview">
-        <video class="vid" id="video" autoplay muted playsinline></video>
+      <div class="preview" id="previewBox">
+        <video class="vid" id="video" autoplay muted playsinline aria-label="Pratinjau kamera"></video>
+        <div class="vf" aria-hidden="true">
+          <span class="vf-tl"></span><span class="vf-tr"></span><span class="vf-bl"></span><span class="vf-br"></span>
+        </div>
         <div class="no-signal" id="noSignal">
-          <span>Belum ada gambar</span>
+          <span>Tidak ada sinyal — kamera belum aktif</span>
+          <button class="link" data-settings="privacy-webcam" type="button">Buka Izin kamera</button>
         </div>
       </div>
 
-      <div class="video-meta">
-        <span id="camInfo">Resolusi —</span>
-        <span id="camFps" title="fps terukur (aktual)">— fps</span>
+      <div class="video-meta readout">
+        <span id="camInfo">Resolusi: —</span>
+        <span id="camFps" title="fps terukur (aktual)">Terukur: — fps</span>
       </div>
 
       <label class="field">
@@ -56,9 +63,9 @@
     </section>
 
     <!-- ============ MIKROFON ============ -->
-    <section class="pane">
+    <section class="pane" aria-labelledby="hMic">
       <div class="pane-head">
-        <h2>Mikrofon</h2>
+        <h2 id="hMic">Mikrofon</h2>
         <span class="chip idle" id="chipMic"><i></i>MIC —</span>
       </div>
 
@@ -68,10 +75,10 @@
           <div class="meter-shade" id="meterShade"></div>
           <div class="meter-peak" id="meterPeak"></div>
         </div>
-        <div class="meter-scale">
+        <div class="meter-scale" aria-hidden="true">
           <span>-60</span><span>-30</span><span>-12</span><span>-3</span><span>0 dB</span>
         </div>
-        <div class="meter-value"><span id="dbValue">—</span> <small>dBFS</small></div>
+        <div class="meter-value" aria-live="polite"><span id="dbValue">—</span> <small>dBFS</small></div>
       </div>
 
       <label class="field">
@@ -88,27 +95,26 @@
           <span class="switch-label">Dengar langsung <small>(listen to this device)</small></span>
         </label>
         <div class="volume">
-          <span>Volume</span>
-          <input type="range" id="monitorVol" min="0" max="100" value="60" />
+          <label for="monitorVol">Volume</label>
+          <input type="range" id="monitorVol" min="0" max="100" value="60" aria-label="Volume monitor mikrofon" />
           <span id="volValue">60%</span>
         </div>
         <p class="warn" id="feedbackWarn">
           Pakai headphone. Tanpa headphone, suara bisa mengiut (feedback).
         </p>
       </div>
-
-      <div class="actions">
-        <button id="btnStart" class="btn primary">Mulai ulang</button>
-        <button id="btnReset" class="btn ghost">Reset</button>
-      </div>
     </section>
   </main>
 
   <footer class="statusbar">
-    <p class="status" id="status">Menyiapkan…</p>
-    <div class="settings-links">
-      <button class="link" data-settings="privacy-webcam">Izin kamera</button>
-      <button class="link" data-settings="privacy-microphone">Izin mikrofon</button>
+    <p class="status" id="status" role="status" aria-live="polite">Menyiapkan…</p>
+    <div class="bar-actions">
+      <button id="btnStart" class="btn primary btn-sm" type="button">Mulai ulang</button>
+      <button id="btnReset" class="btn ghost btn-sm" type="button">Reset</button>
+      <div class="settings-links">
+        <button class="link" data-settings="privacy-webcam" type="button">Izin kamera</button>
+        <button class="link" data-settings="privacy-microphone" type="button">Izin mikrofon</button>
+      </div>
     </div>
   </footer>
 </body>

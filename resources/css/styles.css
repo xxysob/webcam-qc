@@ -17,6 +17,27 @@
   --warn: #e3b341;
   --err: #ff4d6d;
   --radius: 10px;
+
+  /* Fase 1: token semantik (alias, nilai sama — tanpa kejutan visual) */
+  --color-bg: var(--bg);
+  --color-bg-soft: var(--bg-soft);
+  --color-surface: var(--panel);
+  --color-surface-2: var(--panel-2);
+  --color-border: var(--line);
+  --color-text-primary: var(--text);
+  --color-text-secondary: var(--muted);
+  --color-brand-gradient: var(--grad);
+  --color-feedback-ok: var(--ok);
+  --color-feedback-warn: var(--warn);
+  --color-feedback-error: var(--err);
+  --color-focus-ring: #4db8ff;
+  --color-control: #2b3440;
+  --color-control-knob: #cfd6dd;
+  --mono: "Cascadia Mono", Consolas, "Lucida Console", monospace;
+}
+
+html {
+  color-scheme: dark;
 }
 
 *,
@@ -42,6 +63,26 @@ body {
   -webkit-user-select: none;
   user-select: none;
   overflow: hidden;
+  touch-action: manipulation;
+}
+
+/* ---------- a11y: skip link + heading ---------- */
+.skip {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 50;
+  padding: 8px 12px;
+  border-radius: 7px;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--color-focus-ring);
+  text-decoration: none;
+  transition: top 150ms ease;
+}
+
+.skip:focus-visible {
+  top: 8px;
 }
 
 /* ---------- top bar ---------- */
@@ -63,6 +104,7 @@ body {
   font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.2px;
+  margin: 0;
 }
 
 .logo {
@@ -166,7 +208,36 @@ body {
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--line);
+  transition: border-color 150ms ease;
 }
+
+/* Bingkai mengikuti status kamera (diatur via JS: data-cam="ok|err|idle") */
+.preview[data-cam="ok"] {
+  border-color: rgba(3, 233, 156, 0.55);
+}
+
+.preview[data-cam="err"] {
+  border-color: rgba(255, 77, 109, 0.6);
+}
+
+/* Corner ticks viewfinder (CSS murni, tanpa aset) */
+.vf {
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+}
+
+.vf span {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(230, 237, 243, 0.55);
+}
+
+.vf-tl { top: 0; left: 0; border-right: none; border-bottom: none; }
+.vf-tr { top: 0; right: 0; border-left: none; border-bottom: none; }
+.vf-bl { bottom: 0; left: 0; border-right: none; border-top: none; }
+.vf-br { bottom: 0; right: 0; border-left: none; border-top: none; }
 
 .vid {
   width: 100%;
@@ -180,8 +251,10 @@ body {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 10px;
   color: var(--muted);
   font-size: 13px;
   letter-spacing: 0.3px;
@@ -202,9 +275,27 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   font-size: 12px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* Fase 2: readout mono tabular untuk angka QC */
+.video-meta.readout {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  letter-spacing: 0;
+}
+
+.video-meta.readout span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-meta.readout #camFps {
+  flex: none;
 }
 
 /* ---------- fields ---------- */
@@ -241,8 +332,16 @@ select {
   background-repeat: no-repeat;
 }
 
+/* ---------- fokus terlihat untuk semua kontrol ---------- */
+select:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
 select:focus-visible {
-  border-color: #0099ff;
+  border-color: var(--color-focus-ring);
 }
 
 select:disabled {
@@ -393,6 +492,11 @@ select:disabled {
   color: var(--muted);
 }
 
+.volume label {
+  flex: none;
+  cursor: pointer;
+}
+
 .volume span:last-child {
   min-width: 34px;
   text-align: right;
@@ -408,6 +512,7 @@ input[type="range"] {
   background: #2b3440;
   outline: none;
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 input[type="range"]::-webkit-slider-thumb {
@@ -431,12 +536,6 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* ---------- buttons ---------- */
-.actions {
-  display: flex;
-  gap: 9px;
-  margin-top: auto;
-}
-
 .btn {
   flex: 1;
   padding: 10px 14px;
@@ -473,7 +572,14 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--panel-2);
 }
 
-/* ---------- status bar ---------- */
+/* Varian kecil untuk action bar global di footer */
+.btn-sm {
+  flex: none;
+  padding: 7px 14px;
+  font-size: 12.5px;
+}
+
+/* ---------- status bar (action bar global) ---------- */
 .statusbar {
   display: flex;
   align-items: center;
@@ -485,12 +591,23 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .status {
+  flex: 1;
+  min-width: 0;
   font-size: 12.5px;
   color: var(--muted);
-  line-height: 1.35;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+}
+
+.bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
 }
 
 .status.error {
@@ -521,6 +638,16 @@ input[type="range"]::-webkit-slider-thumb {
 .link:hover {
   color: var(--text);
   border-color: #3a4652;
+}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 /* ---------- responsive ---------- */

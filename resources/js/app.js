@@ -11,6 +11,7 @@
 
 const el = {
   video: document.getElementById("video"),
+  previewBox: document.getElementById("previewBox"),
   noSignal: document.getElementById("noSignal"),
   camInfo: document.getElementById("camInfo"),
   camFps: document.getElementById("camFps"),
@@ -57,6 +58,10 @@ function setChip(node, kind, text) {
   node.className = `chip ${kind}`;
   node.innerHTML = "<i></i>";
   node.appendChild(document.createTextNode(text));
+  // Bingkai preview mengikuti status kamera (CSS: .preview[data-cam]).
+  if (node === el.chipCam && el.previewBox) {
+    el.previewBox.dataset.cam = kind === "ok" ? "ok" : kind === "err" ? "err" : "idle";
+  }
 }
 
 function setStatus(text, kind = "") {
@@ -249,13 +254,13 @@ function updateCamInfo(track) {
   const fps = s.frameRate ? Math.round(s.frameRate) : null;
   el.camInfo.textContent =
     s.width && s.height
-      ? `${s.width}×${s.height}${fps ? " · " + fps + " fps" : ""}`
-      : "Resolusi —";
+      ? `${s.width}×${s.height}${fps ? " · nominal " + fps + " fps" : ""}`
+      : "Resolusi: —";
 }
 
 function measureFps(video) {
   if (typeof video.requestVideoFrameCallback !== "function") {
-    el.camFps.textContent = "— fps";
+    el.camFps.textContent = "Terukur: — fps";
     return;
   }
   let frames = 0;
@@ -266,14 +271,14 @@ function measureFps(video) {
     frames += 1;
     const now = performance.now();
     if (now - since >= 1000) {
-      el.camFps.textContent = `${Math.round((frames * 1000) / (now - since))} fps`;
+      el.camFps.textContent = `Terukur: ${Math.round((frames * 1000) / (now - since))} fps`;
       frames = 0;
       since = now;
     }
     video.requestVideoFrameCallback(onFrame);
   };
 
-  el.camFps.textContent = "— fps";
+  el.camFps.textContent = "Terukur: — fps";
   video.requestVideoFrameCallback(onFrame);
 }
 
@@ -302,10 +307,10 @@ function gcd(a, b) {
   return a;
 }
 
-/** Label gaya aplikasi Camera Windows: "720p 16:9 — 1280×720 · 30fps" */
+/** Label gaya aplikasi Camera Windows: "720p 16:9 · 1280×720 · 30fps" */
 function modeLabel(w, h, fps) {
   const g = gcd(w, h) || 1;
-  return `${h}p ${w / g}:${h / g} — ${w}×${h}${fps ? ` · ${fps}fps` : ""}`;
+  return `${h}p ${w / g}:${h / g} · ${w}×${h}${fps ? ` · ${fps}fps` : ""}`;
 }
 
 function modeCacheKey(track) {
@@ -673,8 +678,8 @@ function stopStream() {
 
   el.video.srcObject = null;
   el.noSignal.classList.remove("hidden");
-  el.camInfo.textContent = "Resolusi —";
-  el.camFps.textContent = "— fps";
+  el.camInfo.textContent = "Resolusi: —";
+  el.camFps.textContent = "Terukur: — fps";
   resetModeSelect();
   resetMeter();
 }
@@ -821,10 +826,11 @@ function wire() {
   });
 
   let sliderDragging = false;
+  let sliderKeyboard = false;
   el.monitorVol.addEventListener("input", () => {
-    // Hanya terima perubahan dari drag/klik operator. Perubahan "liar"
-    // (scroll, keyboard, atau state webview) dikembalikan ke nilai terakhir.
-    if (!sliderDragging) {
+    // Terima perubahan dari drag/klik operator ATAU keyboard (panah, Home/End).
+    // Perubahan "liar" lain (state webview) dikembalikan ke nilai terakhir.
+    if (!sliderDragging && !sliderKeyboard) {
       el.monitorVol.value = String(state.volumePercent);
       return;
     }
@@ -837,6 +843,23 @@ function wire() {
 
   el.monitorVol.addEventListener("pointerdown", () => {
     sliderDragging = true;
+  });
+  // Keyboard (panah/Home/End/PageUp/PageDown) tetap diizinkan mengubah volume.
+  el.monitorVol.addEventListener("keydown", (e) => {
+    if (
+      e.key === "ArrowLeft" || e.key === "ArrowRight" ||
+      e.key === "ArrowUp" || e.key === "ArrowDown" ||
+      e.key === "Home" || e.key === "End" ||
+      e.key === "PageUp" || e.key === "PageDown"
+    ) {
+      sliderKeyboard = true;
+    }
+  });
+  el.monitorVol.addEventListener("keyup", () => {
+    sliderKeyboard = false;
+  });
+  el.monitorVol.addEventListener("blur", () => {
+    sliderKeyboard = false;
   });
   const endDrag = () => {
     sliderDragging = false;
